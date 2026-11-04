@@ -1,0 +1,639 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="claude:viewport-fit-sides" content="cover">
+<title>Calendrier &amp; Watchlist</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,600;9..144,800&family=DM+Sans:wght@400;500;700&display=swap">
+<style>
+/* Layout : une colonne de contenu centrée, calendrier + panneau latéral, onglets en pilule.
+   Palette : encre chaude, accent corail, sarcelle. Typo : Fraunces (titres) + DM Sans (texte). */
+:root{
+  color-scheme: light;
+  --bg:#f5f2ec; --surface:#ffffff; --surface-2:#faf8f4; --ink:#1c1a17; --muted:#7d766b; --line:#e6e0d4;
+  --accent:#e0532b; --accent-ink:#ffffff; --accent-soft:#fde6dc; --teal:#1f8a7a;
+  --c-perso:#e0532b; --c-travail:#3760c9; --c-loisir:#1f8a7a; --c-repas:#b9790a;
+  --shadow:0 1px 2px rgba(20,16,10,.06),0 10px 28px rgba(20,16,10,.07);
+  --serif:"Fraunces",Georgia,"Times New Roman",serif;
+  --sans:"DM Sans",system-ui,-apple-system,"Segoe UI",sans-serif;
+}
+@media (prefers-color-scheme: dark){
+  :root:not([data-theme="light"]){
+    color-scheme: dark;
+    --bg:#0d0f13; --surface:#161920; --surface-2:#1b1e26; --ink:#f1ede6; --muted:#8e8a93; --line:#262a34;
+    --accent:#ff7a4d; --accent-ink:#1a0d07; --accent-soft:#2b1c17; --teal:#5fd4bc;
+    --c-perso:#ff7a4d; --c-travail:#7ea6ff; --c-loisir:#5fd4bc; --c-repas:#f0b84a;
+    --shadow:0 1px 2px rgba(0,0,0,.4),0 14px 36px rgba(0,0,0,.35);
+  }
+}
+:root[data-theme="dark"]{
+  color-scheme: dark;
+  --bg:#0d0f13; --surface:#161920; --surface-2:#1b1e26; --ink:#f1ede6; --muted:#8e8a93; --line:#262a34;
+  --accent:#ff7a4d; --accent-ink:#1a0d07; --accent-soft:#2b1c17; --teal:#5fd4bc;
+  --c-perso:#ff7a4d; --c-travail:#7ea6ff; --c-loisir:#5fd4bc; --c-repas:#f0b84a;
+  --shadow:0 1px 2px rgba(0,0,0,.4),0 14px 36px rgba(0,0,0,.35);
+}
+
+*{box-sizing:border-box}
+body{
+  margin:0; background:var(--bg); color:var(--ink);
+  font-family:var(--sans); font-size:15px; line-height:1.5;
+  padding-block:24px 56px;
+  padding-left:max(16px, env(safe-area-inset-left,0px));
+  padding-right:max(16px, env(safe-area-inset-right,0px));
+}
+.app{max-width:1120px;margin:0 auto}
+button,input,select,textarea{font:inherit;color:inherit}
+:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+
+/* En-tête */
+.top{display:flex;flex-wrap:wrap;justify-content:space-between;align-items:flex-end;gap:16px 24px;margin-bottom:22px}
+.brand h1{font-family:var(--serif);font-weight:800;font-size:clamp(30px,5vw,44px);letter-spacing:-.02em;line-height:1;margin:0 0 6px;text-wrap:balance}
+.brand h1 em{font-style:italic;color:var(--accent);font-weight:600}
+.brand p{margin:0;color:var(--muted)}
+.tabs{display:inline-flex;gap:4px;padding:4px;background:var(--surface);border:1px solid var(--line);border-radius:999px;box-shadow:var(--shadow);max-width:100%;overflow-x:auto}
+.tab{border:0;background:transparent;color:var(--muted);padding:9px 16px;border-radius:999px;cursor:pointer;font-weight:500;white-space:nowrap}
+.tab[aria-selected="true"]{background:var(--ink);color:var(--bg)}
+.tab:hover:not([aria-selected="true"]){color:var(--ink)}
+
+.notice{display:none;margin:0 0 18px;padding:12px 16px;border-radius:14px;background:var(--accent-soft);border:1px solid var(--line);font-size:14px}
+.notice.show{display:block}
+
+.panel{background:var(--surface);border:1px solid var(--line);border-radius:22px;box-shadow:var(--shadow);padding:20px;min-width:0}
+.section[hidden]{display:none}
+
+/* Calendrier */
+.cal{display:grid;grid-template-columns:minmax(0,1fr) 300px;gap:20px;align-items:start}
+.cal-head{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:14px}
+.cal-head h2{font-family:var(--serif);font-size:28px;font-weight:600;margin:0;text-transform:capitalize;letter-spacing:-.01em}
+.nav{display:flex;gap:8px;flex-wrap:wrap}
+.btn{border:1px solid var(--line);background:var(--surface-2);border-radius:12px;padding:8px 14px;cursor:pointer;font-weight:500}
+.btn:hover{border-color:var(--muted)}
+.btn.round{width:38px;height:38px;padding:0;border-radius:50%;display:grid;place-items:center;font-size:18px;line-height:1}
+.btn.primary{background:var(--accent);color:var(--accent-ink);border-color:transparent;font-weight:700}
+.btn:disabled{opacity:.45;cursor:not-allowed}
+.wd,.grid{display:grid;grid-template-columns:repeat(7,minmax(0,1fr));gap:6px}
+.wd span{font-size:11px;text-transform:uppercase;letter-spacing:.09em;color:var(--muted);padding:0 8px 6px;font-weight:700}
+.day{background:var(--surface-2);border:1px solid transparent;border-radius:14px;min-height:98px;padding:7px;display:flex;flex-direction:column;gap:4px;cursor:pointer;min-width:0;transition:border-color .15s,transform .15s}
+.day:hover{border-color:var(--line);transform:translateY(-1px)}
+.day.out{opacity:.38}
+.num{width:26px;height:26px;border-radius:50%;display:grid;place-items:center;font-size:13px;font-weight:700;font-variant-numeric:tabular-nums}
+.day.today .num{background:var(--accent);color:var(--accent-ink)}
+.chip{display:block;width:100%;text-align:left;border:0;border-left:3px solid var(--c);background:color-mix(in srgb,var(--c) 18%,transparent);padding:3px 6px;border-radius:6px;font-size:12px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;cursor:pointer}
+.chip:hover{background:color-mix(in srgb,var(--c) 30%,transparent)}
+.more{font-size:11px;color:var(--muted);padding-left:4px}
+.legend{display:flex;flex-wrap:wrap;gap:14px;margin-top:14px;font-size:13px;color:var(--muted)}
+.legend i{display:inline-block;width:10px;height:10px;border-radius:3px;background:var(--c);margin-right:6px;vertical-align:-1px}
+
+.side h3{font-family:var(--serif);font-size:20px;margin:0 0 4px;font-weight:600}
+.side .sub{color:var(--muted);font-size:13px;margin:0 0 10px}
+.up{display:grid;grid-template-columns:54px minmax(0,1fr);gap:12px;padding:11px 0;border-top:1px solid var(--line);align-items:center}
+.up:first-of-type{border-top:0}
+.up .d{text-align:center;background:var(--surface-2);border-radius:12px;padding:6px 0;line-height:1.15}
+.up .d b{display:block;font-family:var(--serif);font-size:20px}
+.up .d small{font-size:10px;text-transform:uppercase;letter-spacing:.08em;color:var(--muted)}
+.up .t{font-weight:500;overflow-wrap:anywhere}
+.up .m{font-size:12px;color:var(--muted)}
+.dot{display:inline-block;width:8px;height:8px;border-radius:50%;background:var(--c);margin-right:6px}
+.empty{color:var(--muted);font-size:14px;padding:18px 0;margin:0}
+
+/* Listes */
+.add{display:flex;flex-wrap:wrap;gap:10px;align-items:flex-end;margin-bottom:18px}
+.add label{display:grid;gap:4px;font-size:12px;color:var(--muted);font-weight:500;min-width:0}
+.add .grow{flex:1 1 220px}
+input,select,textarea{background:var(--surface-2);border:1px solid var(--line);border-radius:12px;padding:10px 12px;min-width:0;width:100%}
+.add select{width:auto}
+.filters{display:flex;flex-wrap:wrap;gap:8px;margin-bottom:16px}
+.chipbtn{border:1px solid var(--line);background:transparent;border-radius:999px;padding:6px 14px;cursor:pointer;color:var(--muted);font-size:14px}
+.chipbtn[aria-pressed="true"]{background:var(--teal);border-color:transparent;color:var(--bg);font-weight:700}
+.cards{display:grid;grid-template-columns:repeat(auto-fill,minmax(230px,1fr));gap:14px}
+.card{background:var(--surface);border:1px solid var(--line);border-radius:18px;padding:16px;display:flex;flex-direction:column;gap:10px;min-width:0;box-shadow:var(--shadow)}
+.card h3{font-family:var(--serif);font-size:20px;line-height:1.2;margin:0;font-weight:600;overflow-wrap:anywhere}
+.card .note{font-size:13px;color:var(--muted);margin:0;overflow-wrap:anywhere}
+.kicker{font-size:11px;text-transform:uppercase;letter-spacing:.09em;font-weight:700;color:var(--teal)}
+.row-actions{display:flex;gap:8px;margin-top:auto;flex-wrap:wrap}
+.status{border:0;border-radius:999px;padding:6px 12px;cursor:pointer;font-weight:700;font-size:13px;background:var(--surface-2);color:var(--muted);border:1px solid var(--line)}
+.status[data-s="En cours"]{background:var(--accent-soft);color:var(--accent);border-color:transparent}
+.status[data-s="Vu"]{background:var(--teal);color:var(--bg);border-color:transparent}
+.del{border:0;background:transparent;color:var(--muted);cursor:pointer;padding:6px 8px;border-radius:8px;font-size:13px}
+.del:hover{color:var(--accent)}
+
+.food-list{list-style:none;margin:0;padding:0;display:grid;gap:8px}
+.food-list li{display:grid;grid-template-columns:auto minmax(0,1fr) auto;gap:12px;align-items:center;background:var(--surface);border:1px solid var(--line);border-radius:16px;padding:12px 14px}
+.food-list li.done .fname{text-decoration:line-through;color:var(--muted)}
+.fname{font-weight:500;overflow-wrap:anywhere}
+.fcat{font-size:12px;color:var(--muted)}
+.check{width:22px;height:22px;accent-color:var(--teal);cursor:pointer}
+.pickbox{display:flex;flex-wrap:wrap;gap:12px;align-items:center;justify-content:space-between;background:var(--accent-soft);border:1px dashed var(--accent);border-radius:18px;padding:16px;margin-bottom:18px}
+.pickbox .res{font-family:var(--serif);font-size:24px;font-weight:600;min-width:0;overflow-wrap:anywhere}
+.pickbox small{display:block;color:var(--muted);font-family:var(--sans);font-size:12px;font-weight:500}
+
+.toast{position:fixed;left:50%;bottom:max(20px,env(safe-area-inset-bottom,0px));transform:translateX(-50%) translateY(120%);background:var(--ink);color:var(--bg);padding:10px 16px;border-radius:12px;font-size:14px;transition:transform .25s;z-index:20;max-width:calc(100vw - 32px)}
+.toast.show{transform:translateX(-50%) translateY(0)}
+
+/* Fenêtre événement */
+dialog{background:var(--surface);color:var(--ink);border:1px solid var(--line);border-radius:22px;padding:22px;width:min(440px,calc(100vw - 32px));box-shadow:var(--shadow)}
+dialog::backdrop{background:rgba(10,8,6,.45)}
+dialog h3{font-family:var(--serif);font-size:24px;margin:0 0 14px;font-weight:600}
+dialog form{display:grid;gap:12px}
+dialog label{display:grid;gap:4px;font-size:12px;color:var(--muted);font-weight:500}
+.dlg-actions{display:flex;gap:8px;justify-content:flex-end;flex-wrap:wrap;margin-top:6px}
+.dlg-actions .spacer{flex:1}
+
+@media (max-width: 860px){
+  .cal{grid-template-columns:minmax(0,1fr)}
+}
+@media (max-width: 640px){
+  .day{min-height:58px;padding:5px;border-radius:10px}
+  .num{width:22px;height:22px;font-size:12px}
+  .chip{height:6px;padding:0;border:0;font-size:0;border-radius:3px;background:var(--c);margin-top:2px}
+  .more{display:none}
+  .cal-head h2{font-size:23px}
+  .wd span{font-size:10px;padding:0 2px 4px;text-align:center}
+  .panel{padding:14px}
+  .side{margin-top:4px}
+}
+</style>
+</head>
+<body>
+<div class="app">
+
+  <header class="top">
+    <div class="brand">
+      <h1>Mon <em>calendrier</em></h1>
+      <p>Les dates, les séries à voir, et ce qu'on mange.</p>
+    </div>
+    <nav class="tabs" role="tablist" aria-label="Sections">
+      <button class="tab" role="tab" data-view="cal" aria-selected="true">Calendrier</button>
+      <button class="tab" role="tab" data-view="watch" aria-selected="false">Watchlist</button>
+      <button class="tab" role="tab" data-view="food" aria-selected="false">À manger</button>
+    </nav>
+  </header>
+
+  <div id="notice" class="notice" role="status">
+    La base de données n'est pas encore branchée, donc rien ne peut être ajouté pour l'instant. Suis le guide GUIDE.md pour la configurer.
+  </div>
+  <div id="notice-load" class="notice" role="status">Les données mettent du temps à arriver. Elles s'afficheront dès qu'elles sont reçues.</div>
+
+  <!-- CALENDRIER -->
+  <section id="view-cal" class="section">
+    <div class="cal">
+      <div class="panel">
+        <div class="cal-head">
+          <h2 id="month-title"></h2>
+          <div class="nav">
+            <button class="btn" id="today-btn">Aujourd'hui</button>
+            <button class="btn round" id="prev" aria-label="Mois précédent">‹</button>
+            <button class="btn round" id="next" aria-label="Mois suivant">›</button>
+            <button class="btn primary" id="new-ev" data-needs-db>+ Événement</button>
+          </div>
+        </div>
+        <div class="wd" aria-hidden="true">
+          <span>Lun</span><span>Mar</span><span>Mer</span><span>Jeu</span><span>Ven</span><span>Sam</span><span>Dim</span>
+        </div>
+        <div id="grid" class="grid"></div>
+        <div class="legend">
+          <span style="--c:var(--c-perso)"><i></i>Perso</span>
+          <span style="--c:var(--c-travail)"><i></i>Travail</span>
+          <span style="--c:var(--c-loisir)"><i></i>Loisir</span>
+          <span style="--c:var(--c-repas)"><i></i>Repas</span>
+        </div>
+      </div>
+
+      <aside class="panel side">
+        <h3>À venir</h3>
+        <p class="sub">Les prochains événements, à partir d'aujourd'hui.</p>
+        <div id="upcoming"></div>
+      </aside>
+    </div>
+  </section>
+
+  <!-- WATCHLIST -->
+  <section id="view-watch" class="section" hidden>
+    <div class="panel">
+      <form id="watch-form" class="add" autocomplete="off">
+        <label class="grow">Titre
+          <input name="title" required maxlength="120" placeholder="Ex. Frieren, Dune, Severance">
+        </label>
+        <label>Type
+          <select name="kind">
+            <option value="serie">Série</option>
+            <option value="film">Film</option>
+            <option value="anime">Animé</option>
+          </select>
+        </label>
+        <label class="grow">Note (facultatif)
+          <input name="note" maxlength="200" placeholder="Qui l'a conseillé, pourquoi…">
+        </label>
+        <button class="btn primary" type="submit" data-needs-db>Ajouter</button>
+      </form>
+
+      <div class="filters" role="group" aria-label="Filtrer par type">
+        <button class="chipbtn" data-filter="all" aria-pressed="true">Tout</button>
+        <button class="chipbtn" data-filter="serie" aria-pressed="false">Séries</button>
+        <button class="chipbtn" data-filter="film" aria-pressed="false">Films</button>
+        <button class="chipbtn" data-filter="anime" aria-pressed="false">Animés</button>
+      </div>
+
+      <div id="watch-list" class="cards"></div>
+    </div>
+  </section>
+
+  <!-- À MANGER -->
+  <section id="view-food" class="section" hidden>
+    <div class="panel">
+      <div class="pickbox">
+        <div>
+          <div class="res" id="pick-res">Pas encore de choix</div>
+          <small>Tire au sort parmi ce qui n'est pas coché.</small>
+        </div>
+        <button class="btn primary" id="pick-btn" data-needs-db>Choisir au hasard</button>
+      </div>
+
+      <form id="food-form" class="add" autocomplete="off">
+        <label class="grow">Plat ou resto
+          <input name="name" required maxlength="120" placeholder="Ex. Ramen, pad thaï, tacos">
+        </label>
+        <label>Catégorie
+          <select name="cat">
+            <option value="Recette">Recette</option>
+            <option value="Resto">Resto</option>
+            <option value="Snack">Snack</option>
+            <option value="Dessert">Dessert</option>
+            <option value="Boisson">Boisson</option>
+          </select>
+        </label>
+        <button class="btn primary" type="submit" data-needs-db>Ajouter</button>
+      </form>
+
+      <ul id="food-list" class="food-list"></ul>
+    </div>
+  </section>
+</div>
+
+<!-- Fenêtre d'événement -->
+<dialog id="ev-dlg" aria-labelledby="ev-title-h">
+  <h3 id="ev-title-h">Nouvel événement</h3>
+  <form id="ev-form">
+    <label>Titre
+      <input name="title" required maxlength="120" placeholder="Ex. Dîner chez Léa">
+    </label>
+    <div style="display:grid;grid-template-columns:1fr 110px;gap:10px">
+      <label>Date
+        <input name="date" type="date" required>
+      </label>
+      <label>Heure
+        <input name="time" type="time">
+      </label>
+    </div>
+    <label>Catégorie
+      <select name="cat">
+        <option value="perso">Perso</option>
+        <option value="travail">Travail</option>
+        <option value="loisir">Loisir</option>
+        <option value="repas">Repas</option>
+      </select>
+    </label>
+    <label>Note
+      <textarea name="note" rows="2" maxlength="300"></textarea>
+    </label>
+    <div class="dlg-actions">
+      <button class="btn" id="ev-del" type="button" hidden>Supprimer</button>
+      <span class="spacer"></span>
+      <button class="btn" id="ev-cancel" type="button">Annuler</button>
+      <button class="btn primary" type="submit">Enregistrer</button>
+    </div>
+  </form>
+</dialog>
+
+<div id="toast" class="toast" role="status" aria-live="polite"></div>
+
+<!-- Firebase : base de données partagée en ligne -->
+<script src="https://www.gstatic.com/firebasejs/10.12.5/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.5/firebase-firestore-compat.js"></script>
+<script>
+// ⚠️ Remplace ces valeurs par celles de TON projet Firebase (voir GUIDE.md).
+const FIREBASE_CONFIG = {
+  apiKey: "AIzaSyDrPF38N487_-BAEXYVel4Ow52gXZJEz5I",
+  authDomain: "calendrier-rayan.firebaseapp.com",
+  projectId: "calendrier-rayan",
+  storageBucket: "calendrier-rayan.firebasestorage.app",
+  messagingSenderId: "92358358988",
+  appId: "1:92358358988:web:3ae169dda1a8e0f600cf69"
+};
+</script>
+<script>
+(() => {
+  "use strict";
+
+  // ---------- Utilitaires ----------
+  const $ = (s, r = document) => r.querySelector(s);
+  const esc = s => String(s ?? "").replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+  const pad = n => String(n).padStart(2, "0");
+  const keyOf = d => `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
+  const parseKey = k => { const [y, m, d] = k.split("-").map(Number); return new Date(y, m - 1, d); };
+  const MONTHS = ["janvier","février","mars","avril","mai","juin","juillet","août","septembre","octobre","novembre","décembre"];
+  const DAYS_SHORT = ["dim.","lun.","mar.","mer.","jeu.","ven.","sam."];
+  const CATS = { perso: { label: "Perso", c: "var(--c-perso)" }, travail: { label: "Travail", c: "var(--c-travail)" },
+                 loisir: { label: "Loisir", c: "var(--c-loisir)" }, repas: { label: "Repas", c: "var(--c-repas)" } };
+  const KINDS = { serie: "Série", film: "Film", anime: "Animé" };
+  const STATUSES = ["À voir", "En cours", "Vu"];
+  const ORDER = { "En cours": 0, "À voir": 1, "Vu": 2 };
+
+  const state = {
+    events: [], watch: [], food: [],
+    cursor: new Date(), view: "cal", watchFilter: "all", slow: new Set()
+  };
+  let DB = null;
+
+  function toast(msg) {
+    const t = $("#toast");
+    t.textContent = msg;
+    t.classList.add("show");
+    clearTimeout(toast._t);
+    toast._t = setTimeout(() => t.classList.remove("show"), 2800);
+  }
+
+  function errorText(err) {
+    switch (err && err.code) {
+      case "quota_exceeded": return "La liste est pleine. Supprime quelques éléments pour continuer.";
+      case "revoked": return "Ton accès à cette liste a été retiré.";
+      case "invalid_argument":
+      case "permission-denied": return "Tu n'as pas le droit de modifier cette liste.";
+      default: return "Enregistrement impossible. Réessaie dans un instant.";
+    }
+  }
+
+  async function write(action, okMsg) {
+    if (!DB) return toast("Lecture seule : rien n'a été enregistré.");
+    try { await action(); if (okMsg) toast(okMsg); }
+    catch (err) { toast(errorText(err)); }
+  }
+
+  // ---------- Abonnements temps réel ----------
+  function listen(col, apply) {
+    const timer = setTimeout(() => { state.slow.add(col); renderNotices(); }, 10000);
+    return DB.collection(col).onSnapshot(snap => {
+      if (!snap.metadata.fromCache) {
+        clearTimeout(timer);
+        state.slow.delete(col);
+        renderNotices();
+      }
+      apply(snap.docs.filter(d => d.exists).map(d => ({ id: d.id, ...d.data() })));
+      renderAll();
+    }, err => {
+      clearTimeout(timer);
+      if (err && err.code === "revoked") toast(errorText(err));
+      else toast("Connexion perdue avec la liste partagée.");
+    });
+  }
+
+  function renderNotices() {
+    $("#notice-load").classList.toggle("show", state.slow.size > 0);
+  }
+
+  // ---------- Calendrier ----------
+  function renderCal() {
+    const c = state.cursor, y = c.getFullYear(), m = c.getMonth();
+    $("#month-title").textContent = `${MONTHS[m]} ${y}`;
+    const first = new Date(y, m, 1);
+    const start = new Date(y, m, 1 - ((first.getDay() + 6) % 7));
+    const todayKey = keyOf(new Date());
+
+    const byDay = {};
+    for (const ev of state.events) (byDay[ev.date] ||= []).push(ev);
+    for (const k in byDay) byDay[k].sort((a, b) => (a.time || "").localeCompare(b.time || ""));
+
+    let html = "";
+    for (let i = 0; i < 42; i++) {
+      const d = new Date(start.getFullYear(), start.getMonth(), start.getDate() + i);
+      const k = keyOf(d);
+      const list = byDay[k] || [];
+      const classes = ["day", d.getMonth() !== m && "out", k === todayKey && "today"].filter(Boolean).join(" ");
+      html += `<div class="${classes}" data-date="${k}" title="${list.length} événement(s)">
+        <span class="num">${d.getDate()}</span>
+        ${list.slice(0, 3).map(ev => `<button class="chip" data-id="${esc(ev.id)}" style="--c:${CATS[ev.cat]?.c || "var(--accent)"}">${ev.time ? esc(ev.time) + " " : ""}${esc(ev.title)}</button>`).join("")}
+        ${list.length > 3 ? `<span class="more">+${list.length - 3} autre(s)</span>` : ""}
+      </div>`;
+    }
+    $("#grid").innerHTML = html;
+  }
+
+  function renderUpcoming() {
+    const todayKey = keyOf(new Date());
+    const items = state.events
+      .filter(e => e.date >= todayKey)
+      .sort((a, b) => a.date.localeCompare(b.date) || (a.time || "").localeCompare(b.time || ""))
+      .slice(0, 8);
+    if (!items.length) {
+      $("#upcoming").innerHTML = `<p class="empty">Rien de prévu. Clique sur un jour du calendrier pour ajouter un événement.</p>`;
+      return;
+    }
+    const tomorrowKey = keyOf(new Date(Date.now() + 864e5));
+    $("#upcoming").innerHTML = items.map(e => {
+      const d = parseKey(e.date);
+      const when = e.date === todayKey ? "Aujourd'hui" : e.date === tomorrowKey ? "Demain" : DAYS_SHORT[d.getDay()];
+      return `<div class="up">
+        <div class="d"><b>${d.getDate()}</b><small>${MONTHS[d.getMonth()].slice(0, 3)}</small></div>
+        <div style="min-width:0">
+          <div class="t"><span class="dot" style="--c:${CATS[e.cat]?.c || "var(--accent)"}"></span>${esc(e.title)}</div>
+          <div class="m">${esc(when)}${e.time ? " · " + esc(e.time) : ""}</div>
+        </div>
+      </div>`;
+    }).join("");
+  }
+
+  // ---------- Watchlist ----------
+  function renderWatch() {
+    const list = state.watch
+      .filter(w => state.watchFilter === "all" || w.kind === state.watchFilter)
+      .sort((a, b) => (ORDER[a.status] ?? 9) - (ORDER[b.status] ?? 9) || (b.createdAt || 0) - (a.createdAt || 0));
+    if (!list.length) {
+      $("#watch-list").innerHTML = `<p class="empty" style="grid-column:1/-1">Rien à regarder pour l'instant. Ajoute ta première série, ton premier film ou animé ci-dessus.</p>`;
+      return;
+    }
+    $("#watch-list").innerHTML = list.map(w => `
+      <article class="card">
+        <span class="kicker">${esc(KINDS[w.kind] || "")}</span>
+        <h3>${esc(w.title)}</h3>
+        ${w.note ? `<p class="note">${esc(w.note)}</p>` : ""}
+        <div class="row-actions">
+          <button class="status" data-s="${esc(w.status)}" data-act="status" data-id="${esc(w.id)}" aria-label="Statut : ${esc(w.status)}. Changer">${esc(w.status)}</button>
+          <button class="del" data-act="del-watch" data-id="${esc(w.id)}">Supprimer</button>
+        </div>
+      </article>`).join("");
+  }
+
+  // ---------- À manger ----------
+  function renderFood() {
+    const list = [...state.food].sort((a, b) => Number(a.done) - Number(b.done) || (b.createdAt || 0) - (a.createdAt || 0));
+    $("#food-list").innerHTML = list.length ? list.map(f => `
+      <li class="${f.done ? "done" : ""}">
+        <input class="check" type="checkbox" data-act="toggle-food" data-id="${esc(f.id)}" ${f.done ? "checked" : ""} aria-label="Coché : ${esc(f.name)}">
+        <div style="min-width:0">
+          <div class="fname">${esc(f.name)}</div>
+          <div class="fcat">${esc(f.cat || "")}</div>
+        </div>
+        <button class="del" data-act="del-food" data-id="${esc(f.id)}">Supprimer</button>
+      </li>`).join("")
+      : `<li style="display:block;border:0;background:none;padding:12px 0;color:var(--muted)">Liste vide. Ajoute des idées de plats ou de restos ci-dessus.</li>`;
+  }
+
+  function renderAll() {
+    renderCal();
+    renderUpcoming();
+    renderWatch();
+    renderFood();
+  }
+
+  // ---------- Navigation ----------
+  function setView(v) {
+    state.view = v;
+    document.querySelectorAll(".tab").forEach(t => t.setAttribute("aria-selected", String(t.dataset.view === v)));
+    for (const s of ["cal", "watch", "food"]) $("#view-" + s).hidden = s !== v;
+  }
+
+  document.querySelector(".tabs").addEventListener("click", e => {
+    const t = e.target.closest(".tab"); if (t) setView(t.dataset.view);
+  });
+
+  $("#prev").addEventListener("click", () => { state.cursor = new Date(state.cursor.getFullYear(), state.cursor.getMonth() - 1, 1); renderCal(); });
+  $("#next").addEventListener("click", () => { state.cursor = new Date(state.cursor.getFullYear(), state.cursor.getMonth() + 1, 1); renderCal(); });
+  $("#today-btn").addEventListener("click", () => { state.cursor = new Date(); renderAll(); });
+
+  // ---------- Événements ----------
+  const evDlg = $("#ev-dlg"), evForm = $("#ev-form");
+
+  function openEvent(ev, date) {
+    evForm.reset();
+    evForm.dataset.id = ev ? ev.id : "";
+    $("#ev-title-h").textContent = ev ? "Modifier l'événement" : "Nouvel événement";
+    evForm.title.value = ev?.title || "";
+    evForm.date.value = ev?.date || date || keyOf(new Date());
+    evForm.time.value = ev?.time || "";
+    evForm.cat.value = ev?.cat || "perso";
+    evForm.note.value = ev?.note || "";
+    $("#ev-del").hidden = !ev;
+    evDlg.showModal();
+    evForm.title.focus();
+  }
+
+  $("#new-ev").addEventListener("click", () => openEvent(null));
+  $("#ev-cancel").addEventListener("click", () => evDlg.close());
+
+  $("#grid").addEventListener("click", e => {
+    const chip = e.target.closest(".chip");
+    if (chip) { openEvent(state.events.find(x => x.id === chip.dataset.id)); return; }
+    const day = e.target.closest(".day");
+    if (day) openEvent(null, day.dataset.date);
+  });
+
+  evForm.addEventListener("submit", async e => {
+    e.preventDefault();
+    const f = evForm;
+    const data = {
+      title: f.title.value.trim(), date: f.date.value, time: f.time.value,
+      cat: f.cat.value, note: f.note.value.trim()
+    };
+    if (!data.title || !data.date) return;
+    const id = f.dataset.id;
+    evDlg.close();
+    await write(
+      () => id ? DB.collection("events").doc(id).update(data)
+               : DB.collection("events").add({ ...data, createdAt: Date.now() }),
+      "Événement enregistré"
+    );
+  });
+
+  $("#ev-del").addEventListener("click", async () => {
+    const id = evForm.dataset.id;
+    if (!id) return;
+    evDlg.close();
+    await write(() => DB.collection("events").doc(id).delete(), "Événement supprimé");
+  });
+
+  // ---------- Watchlist : événements ----------
+  $("#watch-form").addEventListener("submit", async e => {
+    e.preventDefault();
+    const f = e.currentTarget;
+    const title = f.title.value.trim();
+    if (!title) return;
+    const data = { title, kind: f.kind.value, status: "À voir", note: f.note.value.trim(), createdAt: Date.now() };
+    f.reset();
+    await write(() => DB.collection("watch").add(data), "Ajouté à la watchlist");
+  });
+
+  document.querySelectorAll("[data-filter]").forEach(b => b.addEventListener("click", () => {
+    state.watchFilter = b.dataset.filter;
+    document.querySelectorAll("[data-filter]").forEach(x => x.setAttribute("aria-pressed", String(x === b)));
+    renderWatch();
+  }));
+
+  $("#watch-list").addEventListener("click", async e => {
+    const btn = e.target.closest("[data-act]");
+    if (!btn) return;
+    const item = state.watch.find(w => w.id === btn.dataset.id);
+    if (!item) return;
+    if (btn.dataset.act === "status") {
+      const next = STATUSES[(STATUSES.indexOf(item.status) + 1) % STATUSES.length];
+      await write(() => DB.collection("watch").doc(item.id).update({ status: next }));
+    } else if (btn.dataset.act === "del-watch") {
+      await write(() => DB.collection("watch").doc(item.id).delete(), "Retiré de la watchlist");
+    }
+  });
+
+  // ---------- À manger ----------
+  $("#food-form").addEventListener("submit", async e => {
+    e.preventDefault();
+    const f = e.currentTarget;
+    const name = f.name.value.trim();
+    if (!name) return;
+    const data = { name, cat: f.cat.value, done: false, createdAt: Date.now() };
+    f.reset();
+    await write(() => DB.collection("food").add(data), "Ajouté");
+  });
+
+  $("#food-list").addEventListener("click", async e => {
+    const el = e.target.closest("[data-act]");
+    if (!el) return;
+    const item = state.food.find(f => f.id === el.dataset.id);
+    if (!item) return;
+    if (el.dataset.act === "toggle-food") {
+      await write(() => DB.collection("food").doc(item.id).update({ done: !item.done }));
+    } else if (el.dataset.act === "del-food") {
+      await write(() => DB.collection("food").doc(item.id).delete(), "Supprimé");
+    }
+  });
+
+  $("#pick-btn").addEventListener("click", () => {
+    const open = state.food.filter(f => !f.done);
+    if (!open.length) {
+      $("#pick-res").textContent = "Il n'y a plus rien à choisir";
+      return;
+    }
+    const pick = open[Math.floor(Math.random() * open.length)];
+    $("#pick-res").innerHTML = `${esc(pick.name)}<small>${esc(pick.cat || "")}</small>`;
+  });
+
+  // ---------- Démarrage ----------
+  function setReadOnly() {
+    $("#notice").classList.add("show");
+    document.querySelectorAll("[data-needs-db]").forEach(el => el.disabled = true);
+  }
+
+  function init() {
+    renderAll();
+    if (!window.firebase || FIREBASE_CONFIG.apiKey.startsWith("REMPLACE")) { setReadOnly(); return; }
+    firebase.initializeApp(FIREBASE_CONFIG);
+    DB = firebase.firestore();
+    listen("events", docs => { state.events = docs; });
+    listen("watch", docs => { state.watch = docs; });
+    listen("food", docs => { state.food = docs; });
+  }
+
+  init();
+})();
+</script>
+</body>
+</html>
