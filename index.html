@@ -132,6 +132,8 @@ input,select,textarea{background:var(--surface-2);border:1px solid var(--line);b
 
 /* Carte des restos */
 .map{height:440px;border-radius:20px;border:1px solid var(--line);box-shadow:var(--shadow);margin-bottom:18px;overflow:hidden;background:var(--surface-2)}
+.map .leaflet-tile-pane{filter:saturate(.55) brightness(1.04) contrast(.96)}
+.map.dark .leaflet-tile-pane{filter:invert(1) hue-rotate(180deg) brightness(.9) contrast(.92) saturate(.7)}
 .map .leaflet-control-zoom{border:0;box-shadow:var(--shadow)}
 .map .leaflet-control-zoom a{background:var(--surface);color:var(--ink);border-color:var(--line)}
 .leaflet-popup-content-wrapper{background:var(--surface);color:var(--ink);border-radius:14px;box-shadow:var(--shadow)}
@@ -655,7 +657,7 @@ const FIREBASE_CONFIG = {
 
   // ---------- Carte des restos ----------
   // Géocodage via l'API officielle des adresses (data.gouv.fr), sans clé.
-  // Fond de carte : CARTO (clair/sombre) sur OpenStreetMap.
+  // Fond de carte : OpenStreetMap, adouci en CSS (clair, ou inversé en sombre).
   let MAP = null, MARKERS = null;
   const MARKER_IDS = {};
   const FOOD_COLOR = { Recette: "var(--c-loisir)", Resto: "var(--c-travail)", Snack: "var(--c-repas)", Dessert: "var(--c-perso)", Boisson: "var(--muted)" };
@@ -675,10 +677,9 @@ const FIREBASE_CONFIG = {
     const dark = window.matchMedia("(prefers-color-scheme: dark)").matches;
     MAP = L.map("map", { zoomControl: false }).setView([48.8566, 2.3522], 11);
     L.control.zoom({ position: "topright" }).addTo(MAP);
-    L.tileLayer(dark
-      ? "https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png"
-      : "https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png",
-      { subdomains: "abcd", maxZoom: 19, attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> &copy; <a href="https://carto.com/">CARTO</a>' }
+    document.getElementById("map").classList.toggle("dark", dark);
+    L.tileLayer("https://tile.openstreetmap.org/{z}/{x}/{y}.png",
+      { maxZoom: 19, attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>' }
     ).addTo(MAP);
     MARKERS = L.layerGroup().addTo(MAP);
   }
