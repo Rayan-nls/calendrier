@@ -6,6 +6,7 @@
 <title>Calendrier &amp; Watchlist</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,600;9..144,800&family=DM+Sans:wght@400;500;700&display=swap">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css">
 <style>
 /* Layout : une colonne de contenu centrée, calendrier + panneau latéral, onglets en pilule.
    Palette : encre chaude, accent corail, sarcelle. Typo : Fraunces (titres) + DM Sans (texte). */
@@ -129,6 +130,21 @@ input,select,textarea{background:var(--surface-2);border:1px solid var(--line);b
 .pickbox .res{font-family:var(--serif);font-size:26px;font-weight:600;min-width:0;overflow-wrap:anywhere}
 .pickbox small{display:block;color:var(--muted);font-family:var(--sans);font-size:14px;font-weight:500}
 
+/* Carte des restos */
+.map{height:440px;border-radius:20px;border:1px solid var(--line);box-shadow:var(--shadow);margin-bottom:18px;overflow:hidden;background:var(--surface-2)}
+.map .leaflet-control-zoom{border:0;box-shadow:var(--shadow)}
+.map .leaflet-control-zoom a{background:var(--surface);color:var(--ink);border-color:var(--line)}
+.leaflet-popup-content-wrapper{background:var(--surface);color:var(--ink);border-radius:14px;box-shadow:var(--shadow)}
+.leaflet-popup-tip{background:var(--surface)}
+.pop{display:grid;gap:2px;min-width:150px}
+.pop span{font-size:14px;color:var(--muted)}
+.pop small{font-size:13px;color:var(--muted)}
+.pin{width:30px;height:30px;border-radius:50% 50% 50% 0;transform:rotate(-45deg);background:var(--c);border:3px solid var(--surface);box-shadow:0 6px 14px rgba(0,0,0,.35);position:relative;transition:transform .2s}
+.pin::after{content:"";position:absolute;inset:6px;border-radius:50%;background:var(--surface)}
+.pin:hover{transform:rotate(-45deg) scale(1.12)}
+.food-acts{display:flex;gap:6px;align-items:center}
+.btn.small{padding:6px 10px;font-size:14px}
+
 .toast{position:fixed;left:50%;bottom:max(20px,env(safe-area-inset-bottom,0px));transform:translateX(-50%) translateY(120%);background:var(--ink);color:var(--bg);padding:10px 16px;border-radius:12px;font-size:16px;transition:transform .25s;z-index:20;max-width:calc(100vw - 32px)}
 .toast.show{transform:translateX(-50%) translateY(0)}
 
@@ -251,6 +267,8 @@ dialog label{display:grid;gap:4px;font-size:14px;color:var(--muted);font-weight:
         <button class="btn primary" id="pick-btn" data-needs-db>Choisir au hasard</button>
       </div>
 
+      <div id="map" class="map" aria-label="Carte des adresses"></div>
+
       <form id="food-form" class="add" autocomplete="off">
         <label class="grow">Plat ou resto
           <input name="name" required maxlength="120" placeholder="Ex. Ramen, pad thaï, tacos">
@@ -263,6 +281,9 @@ dialog label{display:grid;gap:4px;font-size:14px;color:var(--muted);font-weight:
             <option value="Dessert">Dessert</option>
             <option value="Boisson">Boisson</option>
           </select>
+        </label>
+        <label class="grow">Adresse (facultatif)
+          <input name="address" maxlength="200" placeholder="Ex. 12 rue de Rivoli, Paris">
         </label>
         <button class="btn primary" type="submit" data-needs-db>Ajouter</button>
       </form>
@@ -309,6 +330,7 @@ dialog label{display:grid;gap:4px;font-size:14px;color:var(--muted);font-weight:
 
 <div id="toast" class="toast" role="status" aria-live="polite"></div>
 
+<script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
 <!-- Firebase : base de données partagée en ligne -->
 <script src="https://www.gstatic.com/firebasejs/10.12.5/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.5/firebase-firestore-compat.js"></script>
@@ -473,9 +495,12 @@ const FIREBASE_CONFIG = {
         <input class="check" type="checkbox" data-act="toggle-food" data-id="${esc(f.id)}" ${f.done ? "checked" : ""} aria-label="Coché : ${esc(f.name)}">
         <div style="min-width:0">
           <div class="fname">${esc(f.name)}</div>
-          <div class="fcat">${esc(f.cat || "")}</div>
+          <div class="fcat">${esc(f.cat || "")}${f.address ? " · " + esc(f.address) : ""}</div>
         </div>
-        <button class="del" data-act="del-food" data-id="${esc(f.id)}">Supprimer</button>
+        <div class="food-acts">
+          ${typeof f.lat === "number" ? `<button class="btn small" data-act="locate" data-id="${esc(f.id)}">Carte</button>` : ""}
+          <button class="del" data-act="del-food" data-id="${esc(f.id)}">Supprimer</button>
+        </div>
       </li>`).join("")
       : `<li style="display:block;border:0;background:none;padding:12px 0;color:var(--muted)">Liste vide. Ajoute des idées de plats ou de restos ci-dessus.</li>`;
   }
@@ -485,6 +510,7 @@ const FIREBASE_CONFIG = {
     renderUpcoming();
     renderWatch();
     renderFood();
+    renderMap();
   }
 
   // ---------- Navigation ----------
@@ -492,6 +518,7 @@ const FIREBASE_CONFIG = {
     state.view = v;
     document.querySelectorAll(".tab").forEach(t => t.setAttribute("aria-selected", String(t.dataset.view === v)));
     for (const s of ["cal", "watch", "food"]) $("#view-" + s).hidden = s !== v;
+    if (v === "food" && MAP) setTimeout(() => MAP.invalidateSize(), 50);
   }
 
   document.querySelector(".tabs").addEventListener("click", e => {
@@ -589,9 +616,18 @@ const FIREBASE_CONFIG = {
     const f = e.currentTarget;
     const name = f.name.value.trim();
     if (!name) return;
-    const data = { name, cat: f.cat.value, done: false, createdAt: Date.now() };
+    const address = f.address.value.trim();
+    let geo = null;
+    if (address) {
+      try { geo = await geocode(address); } catch (_) { geo = null; }
+      if (!geo) toast("Adresse introuvable : le plat est ajouté, mais sans point sur la carte.");
+    }
+    const data = {
+      name, cat: f.cat.value, done: false, createdAt: Date.now(),
+      address, lat: geo ? geo.lat : null, lng: geo ? geo.lng : null
+    };
     f.reset();
-    await write(() => DB.collection("food").add(data), "Ajouté");
+    await write(() => DB.collection("food").add(data), geo || !address ? "Ajouté" : null);
   });
 
   $("#food-list").addEventListener("click", async e => {
@@ -599,6 +635,7 @@ const FIREBASE_CONFIG = {
     if (!el) return;
     const item = state.food.find(f => f.id === el.dataset.id);
     if (!item) return;
+    if (el.dataset.act === "locate") { locate(item); return; }
     if (el.dataset.act === "toggle-food") {
       await write(() => DB.collection("food").doc(item.id).update({ done: !item.done }));
     } else if (el.dataset.act === "del-food") {
@@ -616,6 +653,70 @@ const FIREBASE_CONFIG = {
     $("#pick-res").innerHTML = `${esc(pick.name)}<small>${esc(pick.cat || "")}</small>`;
   });
 
+  // ---------- Carte des restos ----------
+  // Géocodage via l'API officielle des adresses (data.gouv.fr), sans clé.
+  // Fond de carte : CARTO (clair/sombre) sur OpenStreetMap.
+  let MAP = null, MARKERS = null;
+  const MARKER_IDS = {};
+  const FOOD_COLOR = { Recette: "var(--c-loisir)", Resto: "var(--c-travail)", Snack: "var(--c-repas)", Dessert: "var(--c-perso)", Boisson: "var(--muted)" };
+
+  async function geocode(address) {
+    const r = await fetch("https://api-adresse.data.gouv.fr/search/?limit=1&q=" + encodeURIComponent(address));
+    if (!r.ok) throw new Error("geocode");
+    const j = await r.json();
+    const f = j.features && j.features[0];
+    if (!f) return null;
+    const [lng, lat] = f.geometry.coordinates;
+    return { lat, lng };
+  }
+
+  function initMap() {
+    if (!window.L || MAP) return;
+    const dark = window.matchMedia("(prefers-color-scheme: dark)").matches;
+    MAP = L.map("map", { zoomControl: false }).setView([48.8566, 2.3522], 11);
+    L.control.zoom({ position: "topright" }).addTo(MAP);
+    L.tileLayer(dark
+      ? "https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png"
+      : "https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png",
+      { subdomains: "abcd", maxZoom: 19, attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> &copy; <a href="https://carto.com/">CARTO</a>' }
+    ).addTo(MAP);
+    MARKERS = L.layerGroup().addTo(MAP);
+  }
+
+  function pinIcon(color) {
+    return L.divIcon({
+      className: "", html: `<div class="pin" style="--c:${color}"></div>`,
+      iconSize: [30, 36], iconAnchor: [15, 34], popupAnchor: [0, -30]
+    });
+  }
+
+  function renderMap() {
+    if (!MAP) return;
+    MARKERS.clearLayers();
+    for (const k in MARKER_IDS) delete MARKER_IDS[k];
+    const pts = [];
+    for (const f of state.food) {
+      if (typeof f.lat !== "number" || typeof f.lng !== "number") continue;
+      const m = L.marker([f.lat, f.lng], { icon: pinIcon(FOOD_COLOR[f.cat] || "var(--accent)") });
+      m.bindPopup(`<div class="pop"><b>${esc(f.name)}</b><span>${esc(f.cat || "")}${f.done ? " · déjà mangé" : ""}</span><small>${esc(f.address || "")}</small></div>`);
+      MARKERS.addLayer(m);
+      MARKER_IDS[f.id] = m;
+      pts.push([f.lat, f.lng]);
+    }
+    if (pts.length && !renderMap.fitted) {
+      MAP.fitBounds(pts, { padding: [50, 50], maxZoom: 14 });
+      renderMap.fitted = true;
+    }
+  }
+
+  function locate(f) {
+    const m = MARKER_IDS[f.id];
+    if (!m || !MAP) return toast("Cette adresse n'est pas placée sur la carte.");
+    document.getElementById("map").scrollIntoView({ behavior: "smooth", block: "center" });
+    MAP.flyTo(m.getLatLng(), 16, { duration: 0.8 });
+    setTimeout(() => m.openPopup(), 850);
+  }
+
   // ---------- Démarrage ----------
   function setReadOnly() {
     $("#notice").classList.add("show");
@@ -623,6 +724,7 @@ const FIREBASE_CONFIG = {
   }
 
   function init() {
+    initMap();
     renderAll();
     if (!window.firebase || FIREBASE_CONFIG.apiKey.startsWith("REMPLACE")) { setReadOnly(); return; }
     firebase.initializeApp(FIREBASE_CONFIG);
