@@ -152,9 +152,9 @@ body.romance .led-strip{opacity:1;animation:led 4s ease-in-out infinite}
 
 .romance-panel{margin-bottom:22px}
 .romance-panel .cal-head .sub{color:var(--muted);font-size:14px}
-.fd{position:relative;min-height:58px;border:0;border-radius:14px;background:var(--surface-2);color:var(--ink);cursor:pointer;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;padding:6px;font-size:15px;font-weight:600;transition:transform .15s}
+.fd{position:relative;min-height:84px;border:0;border-radius:14px;background:var(--surface-2);color:var(--ink);cursor:pointer;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;padding:6px;font-size:15px;font-weight:600;transition:transform .15s}
 .fd:not(:disabled):hover{transform:translateY(-1px)}
-.fd i{font-style:normal;font-size:11px;font-weight:500;color:var(--muted)}
+.fd i{font-style:normal;font-size:12px;line-height:1.3;font-weight:500;color:var(--muted);white-space:nowrap}
 .fd.lvl1{background:rgba(192,132,252,.16)}
 .fd.lvl2{background:rgba(192,132,252,.32)}
 .fd.lvl3{background:rgba(217,70,239,.5)}
@@ -163,6 +163,10 @@ body.romance .led-strip{opacity:1;animation:led 4s ease-in-out infinite}
 .fd.out,.fd:disabled{opacity:.28;cursor:default}
 .fd:disabled span{color:var(--muted)}
 .free-detail{margin:14px 0 6px;font-size:16px;min-height:1.5em}
+@media (max-width: 640px){
+  .fd{min-height:68px;padding:4px}
+  .fd i{font-size:10px}
+}
 
 /* Carte des restos */
 .map{height:440px;border-radius:20px;border:1px solid var(--line);box-shadow:var(--shadow);margin-bottom:18px;overflow:hidden;background:var(--surface-2)}
@@ -218,9 +222,9 @@ dialog label{display:grid;gap:4px;font-size:14px;color:var(--muted);font-weight:
       <h1>Mon <em>calendrier</em></h1>
       <p>Les dates, les séries à voir, et ce qu'on mange.</p>
     </div>
-    <button id="romance-switch" class="switch" role="switch" aria-checked="false" aria-label="Ambiance chambre LED">
+    <button id="romance-switch" class="switch" role="switch" aria-checked="false" aria-label="Appuie chef">
       <span class="track"><span class="knob"></span></span>
-      <span>Ambiance</span>
+      <span>Appuie chef</span>
     </button>
     <nav class="tabs" role="tablist" aria-label="Sections">
       <button class="tab" role="tab" data-view="cal" aria-selected="true">Calendrier</button>
@@ -799,6 +803,8 @@ const FIREBASE_CONFIG = {
   };
   const WEEKDAYS_LONG = ["dimanche","lundi","mardi","mercredi","jeudi","vendredi","samedi"];
   const hm = s => { const [h, m] = s.split(":").map(Number); return h * 60 + m; };
+  // "08:00" -> "8h", "10:45" -> "10h45"
+  const fmt = s => { const [h, m] = s.split(":").map(Number); return m ? `${h}h${String(m).padStart(2, "0")}` : `${h}h`; };
   const freeMinutes = day => (FREE[day] || []).reduce((a, [s, e]) => a + hm(e) - hm(s), 0);
 
   function romanceOn() { return document.body.classList.contains("romance"); }
@@ -823,7 +829,7 @@ const FIREBASE_CONFIG = {
       const lvl = mins >= 600 ? 4 : mins >= 360 ? 3 : mins >= 180 ? 2 : mins > 0 ? 1 : 0;
       const hasData = inMonth && !!FREE[day];
       html += `<button class="fd lvl${lvl}${inMonth ? "" : " out"}" data-day="${day}" ${hasData ? "" : "disabled"} aria-label="${day} novembre">
-        <span>${day}</span>${hasData ? `<i>${Math.round(mins / 60)} h</i>` : ""}
+        <span>${day}</span>${hasData ? `<i>${FREE[day].map(([s, t]) => `${fmt(s)}-${fmt(t)}`).join("<br>")}</i>` : ""}
       </button>`;
     }
     $("#free-grid").innerHTML = html;
@@ -836,8 +842,8 @@ const FIREBASE_CONFIG = {
       if (!b || b.disabled) return;
       const day = Number(b.dataset.day);
       const wd = WEEKDAYS_LONG[new Date(2026, 10, day).getDay()];
-      const slots = (FREE[day] || []).map(([s, t]) => `${s.replace(":", "h")} à ${t.replace(":", "h")}`);
-      $("#free-detail").textContent = `${wd} ${day} novembre : libre de ${slots.join(" et de ")}`;
+      const slots = (FREE[day] || []).map(([s, t]) => `${fmt(s)}-${fmt(t)}`);
+      $("#free-detail").textContent = `${wd} ${day} novembre : libre ${slots.join(" et ")}`;
     });
   }
 
