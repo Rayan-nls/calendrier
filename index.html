@@ -130,6 +130,40 @@ input,select,textarea{background:var(--surface-2);border:1px solid var(--line);b
 .pickbox .res{font-family:var(--serif);font-size:26px;font-weight:600;min-width:0;overflow-wrap:anywhere}
 .pickbox small{display:block;color:var(--muted);font-family:var(--sans);font-size:14px;font-weight:500}
 
+/* Interrupteur « Ambiance » */
+.switch{display:inline-flex;align-items:center;gap:10px;background:var(--surface);border:1px solid var(--line);border-radius:999px;padding:6px 16px 6px 6px;cursor:pointer;box-shadow:var(--shadow);color:var(--ink);font-weight:500}
+.switch .track{width:46px;height:26px;border-radius:999px;background:var(--surface-2);position:relative;transition:background .3s}
+.switch .knob{position:absolute;top:3px;left:3px;width:20px;height:20px;border-radius:50%;background:var(--muted);transition:transform .3s,background .3s}
+.switch[aria-checked="true"] .track{background:var(--accent)}
+.switch[aria-checked="true"] .knob{transform:translateX(20px);background:#fff;box-shadow:0 0 12px #e879f9}
+
+/* Mode chambre LED romantique */
+body.romance{
+  --bg:#12081f; --surface:#1d0f2e; --surface-2:#271542; --ink:#f5ecff; --muted:#b59ad6; --line:#3f2468;
+  --accent:#c084fc; --accent-ink:#1a0a2b; --accent-soft:#3a1d5e; --teal:#e879f9;
+  --shadow:0 0 0 1px rgba(192,132,252,.15),0 0 28px rgba(168,85,247,.35);
+  background:radial-gradient(ellipse at 50% -10%,#3b0764 0%,#12081f 62%) fixed;
+}
+.led-strip{position:fixed;left:0;right:0;top:0;height:4px;background:linear-gradient(90deg,transparent,#c084fc,#e879f9,#a855f7,transparent);box-shadow:0 0 18px #a855f7,0 0 40px #7e22ce;opacity:0;pointer-events:none;transition:opacity .6s;z-index:5}
+.led-strip.bottom{top:auto;bottom:0}
+body.romance .led-strip{opacity:1;animation:led 4s ease-in-out infinite}
+@keyframes led{0%,100%{filter:brightness(.85)}50%{filter:brightness(1.3)}}
+@media (prefers-reduced-motion: reduce){ body.romance .led-strip{animation:none} }
+
+.romance-panel{margin-bottom:22px}
+.romance-panel .cal-head .sub{color:var(--muted);font-size:14px}
+.fd{position:relative;min-height:58px;border:0;border-radius:14px;background:var(--surface-2);color:var(--ink);cursor:pointer;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;padding:6px;font-size:15px;font-weight:600;transition:transform .15s}
+.fd:not(:disabled):hover{transform:translateY(-1px)}
+.fd i{font-style:normal;font-size:11px;font-weight:500;color:var(--muted)}
+.fd.lvl1{background:rgba(192,132,252,.16)}
+.fd.lvl2{background:rgba(192,132,252,.32)}
+.fd.lvl3{background:rgba(217,70,239,.5)}
+.fd.lvl4{background:linear-gradient(135deg,#c084fc,#e879f9);color:#1a0a2b;box-shadow:0 0 18px rgba(232,121,249,.55)}
+.fd.lvl4 i{color:#1a0a2b}
+.fd.out,.fd:disabled{opacity:.28;cursor:default}
+.fd:disabled span{color:var(--muted)}
+.free-detail{margin:14px 0 6px;font-size:16px;min-height:1.5em}
+
 /* Carte des restos */
 .map{height:440px;border-radius:20px;border:1px solid var(--line);box-shadow:var(--shadow);margin-bottom:18px;overflow:hidden;background:var(--surface-2)}
 .map .leaflet-tile-pane{filter:saturate(.55) brightness(1.04) contrast(.96)}
@@ -175,6 +209,8 @@ dialog label{display:grid;gap:4px;font-size:14px;color:var(--muted);font-weight:
 </style>
 </head>
 <body>
+<div class="led-strip" aria-hidden="true"></div>
+<div class="led-strip bottom" aria-hidden="true"></div>
 <div class="app">
 
   <header class="top">
@@ -182,6 +218,10 @@ dialog label{display:grid;gap:4px;font-size:14px;color:var(--muted);font-weight:
       <h1>Mon <em>calendrier</em></h1>
       <p>Les dates, les séries à voir, et ce qu'on mange.</p>
     </div>
+    <button id="romance-switch" class="switch" role="switch" aria-checked="false" aria-label="Ambiance chambre LED">
+      <span class="track"><span class="knob"></span></span>
+      <span>Ambiance</span>
+    </button>
     <nav class="tabs" role="tablist" aria-label="Sections">
       <button class="tab" role="tab" data-view="cal" aria-selected="true">Calendrier</button>
       <button class="tab" role="tab" data-view="watch" aria-selected="false">Watchlist</button>
@@ -193,6 +233,20 @@ dialog label{display:grid;gap:4px;font-size:14px;color:var(--muted);font-weight:
     La base de données n'est pas encore branchée, donc rien ne peut être ajouté pour l'instant. Suis le guide GUIDE.md pour la configurer.
   </div>
   <div id="notice-load" class="notice" role="status">Les données mettent du temps à arriver. Elles s'afficheront dès qu'elles sont reçues.</div>
+
+  <!-- TEMPS LIBRES COMMUNS (visible seulement avec l'ambiance) -->
+  <section id="romance-panel" class="panel romance-panel" aria-label="Nos temps libres" hidden>
+    <div class="cal-head">
+      <h2>Nos temps libres</h2>
+      <span class="sub">Novembre 2026</span>
+    </div>
+    <div class="wd" aria-hidden="true">
+      <span>Lun</span><span>Mar</span><span>Mer</span><span>Jeu</span><span>Ven</span><span>Sam</span><span>Dim</span>
+    </div>
+    <div id="free-grid" class="grid"></div>
+    <p id="free-detail" class="free-detail" aria-live="polite">Touche un jour pour voir les créneaux libres.</p>
+    <p class="sub">Seuls les créneaux libres d'au moins 1 h sont affichés. Plus il y a de violet, plus on est libres.</p>
+  </section>
 
   <!-- CALENDRIER -->
   <section id="view-cal" class="section">
@@ -718,6 +772,75 @@ const FIREBASE_CONFIG = {
     setTimeout(() => m.openPopup(), 850);
   }
 
+  // ---------- Ambiance chambre LED et temps libres communs ----------
+  // Seulement les créneaux libres (d'au moins 1 h) : aucun cours ni horaire de poste.
+  const FREE = {
+    2: [["08:00","10:45"],["14:30","19:00"]],
+    3: [["08:00","14:00"],["16:15","23:30"]],
+    4: [["15:00","18:00"],["21:00","23:30"]],
+    5: [["12:45","23:30"]],
+    6: [["10:30","13:00"],["15:00","17:30"],["19:30","23:30"]],
+    7: [["08:00","11:00"],["14:06","18:00"],["22:03","23:30"]],
+    8: [["08:00","19:00"]],
+    9: [["12:45","17:30"],["19:30","23:30"]],
+    10: [["08:00","10:45"],["12:45","16:15"],["18:30","23:30"]],
+    11: [["08:00","12:00"],["15:00","19:00"]],
+    12: [["14:30","19:00"]],
+    13: [["16:15","18:00"],["22:00","23:30"]],
+    14: [["08:00","23:30"]],
+    15: [["08:00","18:30"],["21:30","23:30"]],
+    16: [["08:00","18:45"],["21:45","23:30"]],
+    17: [["08:00","10:45"],["12:45","16:15"]],
+    18: [["15:15","19:00"]],
+    19: [["12:45","19:00"]],
+    20: [["14:30","18:00"],["21:30","23:30"]],
+    21: [["08:00","23:30"]],
+    22: [["08:00","23:30"]]
+  };
+  const WEEKDAYS_LONG = ["dimanche","lundi","mardi","mercredi","jeudi","vendredi","samedi"];
+  const hm = s => { const [h, m] = s.split(":").map(Number); return h * 60 + m; };
+  const freeMinutes = day => (FREE[day] || []).reduce((a, [s, e]) => a + hm(e) - hm(s), 0);
+
+  function romanceOn() { return document.body.classList.contains("romance"); }
+
+  function setRomance(on) {
+    document.body.classList.toggle("romance", on);
+    $("#romance-switch").setAttribute("aria-checked", String(on));
+    $("#romance-panel").hidden = !on;
+    if (on) renderFreeCal();
+  }
+
+  function renderFreeCal() {
+    const y = 2026, m = 10;
+    const first = new Date(y, m, 1);
+    const start = new Date(y, m, 1 - ((first.getDay() + 6) % 7));
+    let html = "";
+    for (let i = 0; i < 42; i++) {
+      const d = new Date(start.getFullYear(), start.getMonth(), start.getDate() + i);
+      const inMonth = d.getMonth() === m;
+      const day = d.getDate();
+      const mins = inMonth ? freeMinutes(day) : 0;
+      const lvl = mins >= 600 ? 4 : mins >= 360 ? 3 : mins >= 180 ? 2 : mins > 0 ? 1 : 0;
+      const hasData = inMonth && !!FREE[day];
+      html += `<button class="fd lvl${lvl}${inMonth ? "" : " out"}" data-day="${day}" ${hasData ? "" : "disabled"} aria-label="${day} novembre">
+        <span>${day}</span>${hasData ? `<i>${Math.round(mins / 60)} h</i>` : ""}
+      </button>`;
+    }
+    $("#free-grid").innerHTML = html;
+  }
+
+  function initRomance() {
+    $("#romance-switch").addEventListener("click", () => setRomance(!romanceOn()));
+    $("#free-grid").addEventListener("click", e => {
+      const b = e.target.closest(".fd");
+      if (!b || b.disabled) return;
+      const day = Number(b.dataset.day);
+      const wd = WEEKDAYS_LONG[new Date(2026, 10, day).getDay()];
+      const slots = (FREE[day] || []).map(([s, t]) => `${s.replace(":", "h")} à ${t.replace(":", "h")}`);
+      $("#free-detail").textContent = `${wd} ${day} novembre : libre de ${slots.join(" et de ")}`;
+    });
+  }
+
   // ---------- Démarrage ----------
   function setReadOnly() {
     $("#notice").classList.add("show");
@@ -726,6 +849,7 @@ const FIREBASE_CONFIG = {
 
   function init() {
     initMap();
+    initRomance();
     renderAll();
     if (!window.firebase || FIREBASE_CONFIG.apiKey.startsWith("REMPLACE")) { setReadOnly(); return; }
     firebase.initializeApp(FIREBASE_CONFIG);
